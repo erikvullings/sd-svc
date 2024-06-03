@@ -1,0 +1,301 @@
+// Copyright 2021 The Simlin Authors. All rights reserved.
+// Use of this source code is governed by the Apache License,
+// Version 2.0, that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+package project_io;
+
+message GraphicalFunction {
+  enum Kind {
+    CONTINUOUS = 0;
+    DISCRETE = 1;
+    EXTRAPOLATE = 2;
+  };
+  message Scale {
+    double min = 1;
+    double max = 2;
+  }
+  Kind kind = 1;
+  repeated double x_points = 2;
+  repeated double y_points = 3;
+  Scale x_scale = 4;
+  Scale y_scale = 5;
+}
+
+message Variable {
+  // access=output XMILE variables have public access, all others are private.
+  enum Visibility {
+    PRIVATE = 0;
+    PUBLIC = 1;
+  };
+
+  message ScalarEquation {
+    string equation = 1;
+    optional string initial_equation = 2;
+  };
+
+  message ApplyToAllEquation {
+    repeated string dimension_names = 1;
+    string equation = 2;
+    optional string initial_equation = 3;
+  };
+
+  message ArrayedEquation {
+    message Element {
+      string subscript = 1;
+      string equation = 2;
+      optional string initial_equation = 3;
+    };
+
+    repeated string dimension_names = 1;
+    repeated Element elements = 2;
+  };
+
+  message Equation {
+    oneof equation {
+      ScalarEquation scalar = 1;
+      ApplyToAllEquation apply_to_all = 2;
+      ArrayedEquation arrayed = 3;
+    }
+  };
+
+  message Stock {
+    string ident = 1;
+    Equation equation = 8;
+    string documentation = 3;
+    string units = 4;
+    repeated string inflows = 5;
+    repeated string outflows = 6;
+    bool non_negative = 7;
+    bool can_be_module_input = 9;
+    Visibility visibility = 10;
+  };
+
+  message Flow {
+    string ident = 1;
+    Equation equation = 8;
+    string documentation = 3;
+    string units = 4;
+    GraphicalFunction gf = 5;
+    bool non_negative = 7;
+    bool can_be_module_input = 9;
+    Visibility visibility = 10;
+  };
+
+  message Aux {
+    string ident = 1;
+    Equation equation = 6;
+    string documentation = 3;
+    string units = 4;
+    GraphicalFunction gf = 5;
+    bool can_be_module_input = 7;
+    Visibility visibility = 8;
+  };
+
+  message Module {
+    message Reference {
+      string src = 1;
+      string dst = 2;
+    };
+
+    string ident = 1;
+    string model_name = 2;
+    string documentation = 3;
+    string units = 4;
+    repeated Reference references = 5;
+    bool can_be_module_input = 6;
+    Visibility visibility = 7;
+  };
+
+  oneof v {
+    Stock stock = 1;
+    Flow flow = 2;
+    Aux aux = 3;
+    Module module = 4;
+  }
+};
+
+message ViewElement {
+  enum LabelSide {
+    TOP = 0;
+    LEFT = 1;
+    CENTER = 2;
+    BOTTOM = 3;
+    RIGHT = 4;
+  };
+
+  message Aux {
+    string name = 1;
+    int32 uid = 2;
+    double x = 3;
+    double y = 4;
+    LabelSide label_side = 5;
+  };
+
+  message Stock {
+    string name = 1;
+    int32 uid = 2;
+    double x = 3;
+    double y = 4;
+    LabelSide label_side = 5;
+  };
+
+  message FlowPoint {
+    double x = 1;
+    double y = 2;
+    int32 attached_to_uid = 3;
+  }
+
+  message Flow {
+    string name = 1;
+    int32 uid = 2;
+    double x = 3;
+    double y = 4;
+    LabelSide label_side = 5;
+    // int32 segmentWithAux = 3;
+    // double auxPercentageIntoSegment = 4;
+    repeated FlowPoint points = 6;
+  };
+
+  message Link {
+    message LinkPoints {
+      repeated FlowPoint points = 1;
+    }
+    int32 uid = 1;
+    int32 from_uid = 2;
+    int32 to_uid = 3;
+    oneof shape {
+      double arc = 4; // [0, 360)
+      bool is_straight = 5;
+      LinkPoints multi_point = 6;
+    }
+  };
+
+  message Module {
+    string name = 1;
+    int32 uid = 2;
+    double x = 3;
+    double y = 4;
+    LabelSide label_side = 5;
+  };
+
+  message Alias {
+    int32 uid = 1;
+    int32 alias_of_uid = 2;
+    double x = 3;
+    double y = 4;
+    LabelSide label_side = 5;
+  };
+
+  message Cloud {
+    int32 uid = 1;
+    int32 flow_uid = 2;
+    double x = 3;
+    double y = 4;
+  };
+
+  oneof element {
+    Aux aux = 1;
+    Stock stock = 2;
+    Flow flow = 3;
+    Link link = 4;
+    Module module = 5;
+    Alias alias = 6;
+    Cloud cloud = 7;
+  }
+}
+
+message Rect {
+  double x = 1;
+  double y = 2;
+  double width = 3;
+  double height = 4;
+};
+
+message View {
+  enum ViewType {
+    STOCK_FLOW = 0;
+    // INTERFACE = 1;
+    // POPUP = 2;
+    // VENDOR_SPECIFIC = 3;
+  };
+
+  ViewType kind = 1;
+  // background
+  repeated ViewElement elements = 3;
+  Rect viewBox = 4;
+  double zoom = 5;
+};
+
+message Model {
+  string name = 1;
+  // namespaces
+  // no 'resource' or sim_specs in our normalized form
+  repeated Variable variables = 3;
+  repeated View views = 4;
+}
+
+enum SimMethod {
+  EULER = 0;
+  RUNGE_KUTTA_4 = 1;
+}
+
+message Dt {
+  double value = 1;
+  bool is_reciprocal = 2;
+}
+
+message SimSpecs {
+  double start = 1;
+  double stop = 2;
+  Dt dt = 3;
+  Dt save_step = 4;
+  SimMethod sim_method = 5;
+  string time_units = 6;
+};
+
+message Dimension {
+  message DimensionElements {
+    repeated string elements = 1;
+  };
+  message DimensionSize {
+    uint32 size = 1;
+  };
+  string name = 1;
+  repeated string obsolete_elements = 2;
+  oneof dimension {
+    DimensionElements elements = 3;
+    DimensionSize size = 4;
+  }
+};
+
+message Unit {
+  string name = 1;
+  string equation = 2;
+  bool disabled = 3;
+  repeated string alias = 4;
+};
+
+// often we want to import or export a project to a string; whether it is
+// an XMILE model, Vensim, or something else.  This is very useful for
+// debugging import problems, and can be used to send both the protobuf and
+// XMILE output from the frontend to the filesystem
+message Source {
+  enum Extension {
+    UNSPECIFIED = 0;
+    XMILE = 1;
+    VENSIM = 2;
+  };
+  Extension extension = 1;
+  string content = 2;
+};
+
+message Project {
+  string name = 1;
+  SimSpecs sim_specs = 2;
+  repeated Dimension dimensions = 4;
+  repeated Unit units = 6;
+  repeated Model models = 3;
+  Source source = 5;
+};

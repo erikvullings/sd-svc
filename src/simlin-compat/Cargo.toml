@@ -1,0 +1,23 @@
+[package]
+name = "simlin-compat"
+version = "0.1.0"
+authors = ["Bobby Powers <bobbypowers@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+vensim = ["xmutil"]
+
+[dependencies]
+csv = "1"
+float-cmp = "0.9"
+quick-xml = { version = "0.31", features = [ "serialize", "overlapped-lists" ] }
+serde = { version = "1", features = [ "derive" ] }
+simlin-engine = { version = "0.1", path = "../simlin-engine" }
+xmutil = { version = "1", path = "../xmutil", optional = true }
+
+[dev-dependencies]
+test-generator = { version = "0.3.0", git = "https://github.com/bpowers/test-generator", rev = "b78145bfb6a6f81425dfd6fbacb9c03624e79b2c" }

@@ -1,0 +1,33 @@
+[package]
+name = "simlin-engine"
+version = "0.1.0"
+authors = ["Bobby Powers <bobbypowers@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+wasm = ["wasm-bindgen"]
+
+[dependencies]
+lazy_static = "1"
+regex = "1"
+unicode-xid = "0.2"
+lalrpop-util = "0.20"
+prost = "0.12"
+float-cmp = "0.9"
+ordered-float = "4"
+# rand = "0.8"
+smallvec = { version = "1", features = [ "union" ] }
+wasm-bindgen = { version = "0.2", optional = true }
+getrandom = { version = "0.2", features = [ "js" ] }
+
+[dev-dependencies]
+rand = "0.8"
+
+[build-dependencies]
+lalrpop = "0.20"
+prost-build = "0.12"

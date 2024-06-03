@@ -1,0 +1,16 @@
+[workspace]
+
+resolver = "2"
+members = [
+  "src/simlin-cli",
+  "src/simlin-compat",
+  "src/simlin-engine",
+  "src/xmutil",
+  "src/rest-svc",
+]
+
+[profile.release]
+opt-level = 3
+lto = false
+debug = 1
+panic = "abort"

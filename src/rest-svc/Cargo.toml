@@ -1,0 +1,19 @@
+[package]
+name = "rest-svc"
+description = "Axum REST service for the SD-API"
+homepage = "https://github.com/erikvullings/sd-svc"
+keywords = ["sd-api", "system dynamics", "api", "rest", "openapi"]
+categories = ["web-programming::http-server"]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Erik Vullings erik.vullings@gmail.com"]
+repository = "https://github.com/erikvullings/sd-svc"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.38", features = ["full"] }
+utoipa = { version = "4.2", features = ["axum_extras"] }
