@@ -6,7 +6,7 @@ members = [
   "src/simlin-compat",
   "src/simlin-engine",
   "src/xmutil",
-  "src/rest-svc",
+  "src/sd-svc",
 ]
 
 [profile.release]

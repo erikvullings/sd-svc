@@ -1,5 +1,5 @@
 [package]
-name = "rest-svc"
+name = "sd-svc"
 description = "Axum REST service for the SD-API"
 homepage = "https://github.com/erikvullings/sd-svc"
 keywords = ["sd-api", "system dynamics", "api", "rest", "openapi"]
@@ -14,6 +14,15 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.7"
+axum = { version = "0.7.5", features = ["multipart"] }
 tokio = { version = "1.38", features = ["full"] }
-utoipa = { version = "4.2", features = ["axum_extras"] }
+utoipa = { version = "5.0.0-alpha.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "7.1.1-alpha.0", features = [
+  "axum",
+], default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+simlin-compat = { version = "0.1", path = "../simlin-compat", features = [
+  "vensim",
+] }
+hyper = { version = "1.3" }
