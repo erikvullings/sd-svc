@@ -57,7 +57,10 @@ mod sd {
     };
     use hyper::{HeaderMap, StatusCode};
     use serde::{Deserialize, Serialize};
-    use simlin_compat::{engine::build_sim_with_stderrors, open_xmile};
+    use simlin_compat::{
+        engine::{build_sim_with_stderrors, datamodel::Variable},
+        open_xmile,
+    };
     use simlin_compat::{
         engine::{datamodel::Project, SimSpecs, Vm},
         Results,
@@ -67,8 +70,8 @@ mod sd {
 
     #[derive(OpenApi)]
     #[openapi(
-        paths(list_projects, create_sd_project, list_models, delete_sd_project, simulate_sd_project), // , search_todos, mark_done
-        components(schemas(SdError))
+        paths(list_projects, create_sd_project, list_models, list_model_variables, delete_sd_project, simulate_sd_project), // , search_todos, mark_done
+        components(schemas(SdError, SdVariableType, SdVariable, SdSimSpecs, SdResults))
     )]
     pub(super) struct SdApi;
 
@@ -76,11 +79,13 @@ mod sd {
     type Store = Mutex<Vec<Project>>;
 
     #[derive(Serialize, Deserialize, ToSchema)]
+    #[serde(rename_all = "camelCase")]
     struct SdProject {
         project: String,
     }
 
     #[derive(Serialize, Deserialize, ToSchema)]
+    #[serde(rename_all = "camelCase")]
     struct SdSimSpecs {
         start: f64,
         stop: f64,
@@ -102,6 +107,7 @@ mod sd {
     }
 
     #[derive(Serialize, Deserialize, ToSchema)]
+    #[serde(rename_all = "camelCase")]
     struct SdResults {
         data: HashMap<String, Vec<f64>>,
         sim_specs: SdSimSpecs,
@@ -162,7 +168,7 @@ mod sd {
         }
     }
 
-    /// Todo operation errors
+    /// SD operation errors
     #[derive(Serialize, Deserialize, ToSchema)]
     enum SdError {
         /// SD project or model already exists conflict.
@@ -176,20 +182,66 @@ mod sd {
         Unauthorized(String),
     }
 
+    #[derive(Serialize, Deserialize, ToSchema)]
+    enum SdVariableType {
+        Stock,
+        Flow,
+        Aux,
+        Module,
+    }
+
+    impl From<Variable> for SdVariableType {
+        fn from(variable: Variable) -> Self {
+            match variable {
+                Variable::Stock(_) => SdVariableType::Stock,
+                Variable::Flow(_) => SdVariableType::Flow,
+                Variable::Aux(_) => SdVariableType::Aux,
+                Variable::Module(_) => SdVariableType::Module,
+            }
+        }
+    }
+
+    /// SD model variables
+    #[derive(Serialize, Deserialize, ToSchema)]
+    #[serde(rename_all = "camelCase")]
+    struct SdVariable {
+        can_be_model_input: bool,
+        eqn: String,
+        ident: String,
+        units: Option<String>,
+        /// Private or public
+        visibility: String,
+        variable_type: SdVariableType,
+    }
+
+    impl From<Variable> for SdVariable {
+        fn from(variable: Variable) -> Self {
+            SdVariable {
+                can_be_model_input: variable.can_be_module_input(),
+                eqn: format!("{:?}", variable.get_equation()),
+                ident: variable.get_ident().to_string(),
+                units: variable.get_units().cloned(),
+                visibility: format!("{:?}", variable.get_visibility()),
+                variable_type: variable.into(),
+            }
+        }
+    }
+
     pub(super) fn router() -> Router {
         let store = Arc::new(Store::default());
         Router::new()
             .route("/", routing::get(list_projects).post(create_sd_project))
             .route("/:id", routing::get(list_models).delete(delete_sd_project))
+            .route("/:id/:model", routing::get(list_model_variables))
             .route("/:id/simulate", routing::get(simulate_sd_project))
             // .route("/search", routing::get(search_todos))
             // .route("/:id", routing::put(mark_done).delete(delete_todo))
             .with_state(store)
     }
 
-    /// List all SD models
+    /// List all SD projects
     ///
-    /// List all SD models from in-memory storage.
+    /// List all SD projects from in-memory storage.
     #[utoipa::path(
       get,
       path = "",
@@ -345,7 +397,7 @@ mod sd {
         (status = 404, description = "SD project not found", body = SdError),
       ),
       params(
-          ("id" = String, Path, description = "SD database id")
+          ("id" = String, Path, description = "SD project ID")
       ),
       security(
           ("api_key" = [])
@@ -364,6 +416,55 @@ mod sd {
         if let Some(project) = projects.iter().find(|project| project.name == id) {
             let model_names: Vec<String> = project.models.iter().map(|m| m.name.clone()).collect();
             (StatusCode::OK, Json(model_names)).into_response()
+        } else {
+            (
+                StatusCode::NOT_FOUND,
+                Json(SdError::NotFound(format!("id = {id}"))),
+            )
+                .into_response()
+        }
+    }
+
+    /// List all variables of SD model
+    ///
+    /// List all variables in an SD model of an SD project.
+    #[utoipa::path(
+      get,
+      path = "/{id}/{model}",
+      responses(
+        (status = 200, description = "List SD project model variables successfully", body = [String]),
+        (status = 404, description = "SD project or model not found", body = SdError),
+      ),
+      params(
+        ("id" = String, Path, description = "SD project ID"),
+        ("model" = String, Path, description = "SD model ID"),
+      ),
+      security(
+          ("api_key" = [])
+      )
+    )]
+    async fn list_model_variables(
+        Path((id, model_id)): Path<(String, String)>,
+        State(store): State<Arc<Store>>,
+        headers: HeaderMap,
+    ) -> impl IntoResponse {
+        match check_api_key(false, headers) {
+            Ok(_) => (),
+            Err(error) => return error.into_response(),
+        }
+        let projects = store.lock().await.clone();
+        if let Some(project) = projects.iter().find(|project| project.name == id) {
+            if let Some(model) = project.models.iter().find(|model| model.name == model_id) {
+                let model_variables: Vec<SdVariable> =
+                    model.variables.iter().map(|v| v.clone().into()).collect();
+                (StatusCode::OK, Json(model_variables)).into_response()
+            } else {
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(SdError::NotFound(format!("model = {model_id}"))),
+                )
+                    .into_response()
+            }
         } else {
             (
                 StatusCode::NOT_FOUND,
